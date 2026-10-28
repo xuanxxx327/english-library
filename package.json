@@ -1,7 +1,7 @@
 {
   "private": true,
   "scripts": {
-    "test": "node test.cjs"
+    "test": "node test.cjs && node test-ai.cjs"
   },
   "devDependencies": {
     "fake-indexeddb": "6.2.4"
