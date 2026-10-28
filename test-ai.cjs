@@ -14,4 +14,8 @@ assert.equal(consensus('of Next, Daddy Pig puts plaster, over the bricks.', 'Nex
 assert.equal(consensus('Hello world', 'Hallo world'),null);
 assert.equal(consensus('abcNext, Daddy Pig puts plaster', 'Next, Daddy Pi g puts plaster'),null);
 assert.equal(consensus('Next, Daddy Pig puts plaster', 'Next, Daddy Pi x puts plaster'),null);
+const repair=(s,words)=>vm.runInContext(`aiRepairSpaces(${JSON.stringify(s)},new Set(${JSON.stringify(words)}))`,context);
+assert.equal(repair('.Then peppa vac uums the f loor.',['then','peppa','vac','vacuums','the','floor','f','a','i']), 'Then peppa vacuums the floor.');
+assert.equal(repair('The pig puts plaster over the bricks.',['the','pig','puts','plaster','over','bricks','them','a','i']),null);
+assert.equal(repair('a gain is good',['a','gain','again','is','good']),null);
 assert.match(lastTranslation,/langpair=en%7Czh-CN/);console.log('PASS: spacing repair only with continuous letter match and word boundary');})().catch(e=>{console.error(e);process.exit(1)});
