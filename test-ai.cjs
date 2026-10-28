@@ -18,4 +18,28 @@ const repair=(s,words)=>vm.runInContext(`aiRepairSpaces(${JSON.stringify(s)},new
 assert.equal(repair('.Then peppa vac uums the f loor.',['then','peppa','vac','vacuums','the','floor','f','a','i']), 'Then peppa vacuums the floor.');
 assert.equal(repair('The pig puts plaster over the bricks.',['the','pig','puts','plaster','over','bricks','them','a','i']),null);
 assert.equal(repair('a gain is good',['a','gain','again','is','good']),null);
+await vm.runInContext(`(async()=>{
+  const first=Object.assign(new Blob(['batch-one'],{type:'image/png'}),{name:'one.png'});
+  const second=Object.assign(new Blob(['batch-two'],{type:'image/png'}),{name:'two.png'});
+  $('aiImage').files=[first,second];$('aiImage').onchange();
+  for(let n=0;n<100&&aiJob;n++)await new Promise(r=>setTimeout(r,5));
+  assert.equal(aiBatch.length,2);assert.equal(aiImage,first);
+  assert.ok($('aiBatchStatus').textContent.includes('第 1 / 2 张'));
+  await $('aiSave').onclick();assert.equal(globalThis.remote.length,1);
+  $('aiEnglishReviewed').checked=true;$('aiEnglishReviewed').onchange();
+  $('aiChinese').value='第一张';$('aiChineseReviewed').checked=true;$('aiChineseReviewed').onchange();
+  await $('aiSave').onclick();await new Promise(r=>setTimeout(r,10));
+  assert.equal(aiImage,second);assert.equal($('aiEnglishReviewed').checked,false);
+  assert.equal($('aiChinese').value,'');assert.equal(globalThis.remote.length,2);
+  for(let n=0;n<100&&aiJob;n++)await new Promise(r=>setTimeout(r,5));
+  $('aiEnglishReviewed').checked=true;$('aiEnglishReviewed').onchange();
+  $('aiChinese').value='第二张';$('aiChineseReviewed').checked=true;$('aiChineseReviewed').onchange();
+  await $('aiSave').onclick();await new Promise(r=>setTimeout(r,10));
+  assert.equal(aiImage,null);assert.equal(globalThis.remote.length,3);
+  assert.equal((await all(legacyDB)).length,9);
+  $('aiImage').files=[first,second];$('aiImage').onchange();
+  for(let n=0;n<100&&aiJob;n++)await new Promise(r=>setTimeout(r,5));
+  $('aiSkip').onclick();assert.equal(aiImage,second);
+  assert.equal(globalThis.remote.length,3);
+})()`,Object.assign(context,{assert,remote}));
 assert.match(lastTranslation,/langpair=en%7Czh-CN/);console.log('PASS: spacing repair only with continuous letter match and word boundary');})().catch(e=>{console.error(e);process.exit(1)});
