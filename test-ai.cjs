@@ -16,6 +16,7 @@ assert.equal(consensus('abcNext, Daddy Pig puts plaster', 'Next, Daddy Pi g puts
 assert.equal(consensus('Next, Daddy Pig puts plaster', 'Next, Daddy Pi x puts plaster'),null);
 const repair=(s,words)=>vm.runInContext(`aiRepairSpaces(${JSON.stringify(s)},new Set(${JSON.stringify(words)}))`,context);
 assert.equal(repair('.Then peppa vac uums the f loor.',['then','peppa','vac','vacuums','the','floor','f','a','i']), 'Then peppa vacuums the floor.');
+assert.equal(repair('Next, Daddy Pig puts p laster over the br i cks.',['next','daddy','pig','puts','plaster','over','the','bricks','a','i']),'Next, Daddy Pig puts plaster over the bricks.');
 assert.equal(repair('The pig puts plaster over the bricks.',['the','pig','puts','plaster','over','bricks','them','a','i']),null);
 assert.equal(repair('a gain is good',['a','gain','again','is','good']),null);
 assert.equal(vm.runInContext("aiRepairShortFragments('Daddy Pig has to mend the wa l before Mummy Pig comes home.')",context),'Daddy Pig has to mend the wal before Mummy Pig comes home.');
