@@ -73,7 +73,31 @@ function aiConsensus(a,b){
   }
   return result.replace(/\s+/g,' ').replace(/\s+([,.!?;:])/g,'$1').trim();
 }
-$('aiPaddle').onclick=async()=>{if(!aiImage||aiJob)return aiStatus('请先选择图片');aiBusy(true);try{aiStatus('正在加载 PaddleOCR，首次需下载约 65 MB 模型，请保持页面打开…');if(!window.ort)await aiLoadScript('https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.min.js');if(!window.cv?.Mat)await aiLoadScript('https://docs.opencv.org/4.8.0/opencv.js');for(let i=0;i<60&&!window.cv?.Mat;i++)await new Promise(r=>setTimeout(r,500));if(!window.cv?.Mat)throw Error('OpenCV 初始化失败');if(!paddleEngine){const Paddle=await import('https://cdn.jsdelivr.net/npm/esearch-ocr@5.1.5/dist/esearch-ocr.js');const assets='https://cdn.jsdelivr.net/npm/paddleocr-browser@1.0.4/dist/';const response=await fetch(assets+'ppocr_keys_v1.txt');if(!response.ok)throw Error('PaddleOCR 字典下载失败');await Paddle.init({detPath:assets+'ppocr_det.onnx',recPath:assets+'ppocr_rec.onnx',dic:await response.text(),ort:window.ort, node:false,cv:window.cv});paddleEngine=Paddle}aiStatus('PaddleOCR 正在本机识别…');const result=await paddleEngine.ocr(await blob64(aiImage));const lines=(result.src||[]).map(x=>({text:x.text||'',x:x.box?.[0]?.[0]||0,y:x.box?.[0]?.[1]||0})).sort((a,b)=>Math.abs(a.y-b.y)<25?a.x-b.x:a.y-b.y);const alternative=lines.map(x=>x.text).join(' ').replace(/\s+/g,' ').trim();if(!alternative)throw Error('没有识别到英文');$('aiPaddleText').value=alternative;$('aiAlternative').hidden=false;const consensus=aiConsensus($('aiEnglish').value,alternative);$('aiConsensusBox').hidden=!consensus;if(consensus)$('aiConsensusText').value=consensus;aiStatus(consensus?'两引擎字母连续匹配，已用原识别的单词间隔生成候选；请对照原图确认。':'增强识别完成。请对照原图比较两种结果，确认英文后再翻译。')}catch(e){aiStatus('增强识别失败：'+(e.message||e)+'。原有识别和卡片均未改动。')}finally{aiBusy(false)}};
+let aiWordListPromise=null;
+function aiWordList(){
+  if(!aiWordListPromise)aiWordListPromise=fetch('https://cdn.jsdelivr.net/npm/word-list@4.1.0/words.txt')
+    .then(r=>{if(!r.ok)throw Error('词表下载失败');return r.text()})
+    .then(s=>new Set(s.toLowerCase().split(/\s+/).concat(['a','i'])))
+    .catch(e=>{aiWordListPromise=null;throw e});
+  return aiWordListPromise;
+}
+function aiRepairSpaces(text,words){
+  const parts=text.trim().split(/\s+/),output=[];
+  let changed=false;
+  for(const part of parts){
+    const match=part.match(/^([^A-Za-z]*)([A-Za-z]+)([^A-Za-z]*)$/);
+    const prev=output[output.length-1],left=prev?.match(/^([^A-Za-z]*)([A-Za-z]+)([^A-Za-z]*)$/);
+    if(match&&left&&!left[3]&&!match[1]&&Math.min(left[2].length,match[2].length)<=4){
+      const combined=(left[2]+match[2]).toLowerCase();
+      if(words.has(combined)&&(!words.has(left[2].toLowerCase())||!words.has(match[2].toLowerCase()))){
+        output[output.length-1]=left[1]+left[2]+match[2]+match[3];changed=true;continue;
+      }
+    }
+    output.push(part);
+  }
+  return changed?output.join(' ').replace(/^\.(?=[A-Za-z])/, ''):null;
+}
+$('aiPaddle').onclick=async()=>{if(!aiImage||aiJob)return aiStatus('请先选择图片');aiBusy(true);try{aiStatus('正在加载 PaddleOCR，首次需下载约 65 MB 模型，请保持页面打开…');if(!window.ort)await aiLoadScript('https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.min.js');if(!window.cv?.Mat)await aiLoadScript('https://docs.opencv.org/4.8.0/opencv.js');for(let i=0;i<60&&!window.cv?.Mat;i++)await new Promise(r=>setTimeout(r,500));if(!window.cv?.Mat)throw Error('OpenCV 初始化失败');if(!paddleEngine){const Paddle=await import('https://cdn.jsdelivr.net/npm/esearch-ocr@5.1.5/dist/esearch-ocr.js');const assets='https://cdn.jsdelivr.net/npm/paddleocr-browser@1.0.4/dist/';const response=await fetch(assets+'ppocr_keys_v1.txt');if(!response.ok)throw Error('PaddleOCR 字典下载失败');await Paddle.init({detPath:assets+'ppocr_det.onnx',recPath:assets+'ppocr_rec.onnx',dic:await response.text(),ort:window.ort, node:false,cv:window.cv});paddleEngine=Paddle}aiStatus('PaddleOCR 正在本机识别…');const result=await paddleEngine.ocr(await blob64(aiImage));const lines=(result.src||[]).map(x=>({text:x.text||'',x:x.box?.[0]?.[0]||0,y:x.box?.[0]?.[1]||0})).sort((a,b)=>Math.abs(a.y-b.y)<25?a.x-b.x:a.y-b.y);const alternative=lines.map(x=>x.text).join(' ').replace(/\s+/g,' ').trim();if(!alternative)throw Error('没有识别到英文');$('aiPaddleText').value=alternative;$('aiAlternative').hidden=false;let candidate=aiConsensus($('aiEnglish').value,alternative),source=candidate?'engines':'';if(!candidate){try{candidate=aiRepairSpaces(alternative,await aiWordList());if(candidate)source='dictionary'}catch(e){/* Keep the Paddle text available for manual correction. */}}$('aiConsensusBox').hidden=!candidate;if(candidate){$('aiConsensusText').value=candidate;$('aiConsensusLabel').textContent=source==='dictionary'?'词表建议修复空格（请逐字核对）':'修复单词间隔的合并候选'}aiStatus(source==='engines'?'两引擎字母连续匹配，已用原识别的单词间隔生成候选；请对照原图确认。':source==='dictionary'?'已根据本机英文词表生成空格修复草稿，字母与大小写仍需对照原图核对。':'增强识别完成。请对照原图比较两种结果，手动修正英文后再翻译。')}catch(e){aiStatus('增强识别失败：'+(e.message||e)+'。原有识别和卡片均未改动。')}finally{aiBusy(false)}};
 $('aiUseConsensus').onclick=()=>{if(!$('aiConsensusText').value)return;$('aiEnglish').value=$('aiConsensusText').value;$('aiEnglish').oninput();aiStatus('已填入合并候选，请对照原图核对后确认英文。')};
 $('aiUsePaddle').onclick=()=>{if(!$('aiPaddleText').value)return;$('aiEnglish').value=$('aiPaddleText').value;$('aiEnglish').oninput();aiStatus('已填入增强识别草稿，请对照原图修正，再勾选英文核对。')};
 $('aiTranslate').onclick=async()=>{const en=$('aiEnglish').value.trim();if(!en||aiJob)return aiStatus('请先检查并填写英文');if(!$('aiEnglishReviewed').checked||reviewedEnglish!==en)return aiStatus('请先对照原图核对英文，并勾选“我已核对英文”。');$('aiChineseReviewed').checked=false;reviewedChinese='';aiBusy(true);try{if(new TextEncoder().encode(en).length>500)throw Error('免费接口每次最多 500 字节，请缩短英文或手动填写中文');aiStatus('正在翻译英文…');const url='https://api.mymemory.translated.net/get?q='+encodeURIComponent(en)+'&langpair=en%7Czh-CN';const response=await fetch(url);if(!response.ok)throw Error('翻译服务 HTTP '+response.status);const result=await response.json();if(result.responseStatus!==200||!result.responseData?.translatedText)throw Error(result.responseDetails||'没有返回译文');const decoded=document.createElement('textarea');decoded.innerHTML=result.responseData.translatedText;$('aiChinese').value=decoded.value;aiStatus('翻译已生成，请核对并修改中文。')}catch(e){aiStatus('自动翻译失败：'+(e.message||e)+'。可以手动填写中文。')}finally{aiBusy(false)}};
