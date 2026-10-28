@@ -113,16 +113,18 @@ function aiWordList(){
 function aiRepairSpaces(text,words){
   const parts=text.trim().split(/\s+/),output=[];
   let changed=false;
-  for(const part of parts){
-    const match=part.match(/^([^A-Za-z]*)([A-Za-z]+)([^A-Za-z]*)$/);
-    const prev=output[output.length-1],left=prev?.match(/^([^A-Za-z]*)([A-Za-z]+)([^A-Za-z]*)$/);
-    if(match&&left&&!left[3]&&!match[1]&&Math.min(left[2].length,match[2].length)<=4){
-      const combined=(left[2]+match[2]).toLowerCase();
-      if(words.has(combined)&&(!words.has(left[2].toLowerCase())||!words.has(match[2].toLowerCase()))){
-        output[output.length-1]=left[1]+left[2]+match[2]+match[3];changed=true;continue;
+  for(let i=0;i<parts.length;){
+    let merged=false;
+    for(let count=Math.min(4,parts.length-i);count>=2;count--){
+      const tokens=parts.slice(i,i+count).map(part=>part.match(/^([^A-Za-z]*)([A-Za-z]+)([^A-Za-z]*)$/));
+      if(tokens.some(x=>!x)||tokens.slice(0,-1).some(x=>x[3])||tokens.slice(1).some(x=>x[1]))continue;
+      const chunks=tokens.map(x=>x[2]),combined=chunks.join('').toLowerCase();
+      if(Math.min(...chunks.map(x=>x.length))<=4&&words.has(combined)&&chunks.some(x=>!words.has(x.toLowerCase()))){
+        output.push(tokens[0][1]+chunks.join('')+tokens[tokens.length-1][3]);
+        i+=count;changed=merged=true;break;
       }
     }
-    output.push(part);
+    if(!merged)output.push(parts[i++]);
   }
   return changed?output.join(' ').replace(/^\.(?=[A-Za-z])/, ''):null;
 }
